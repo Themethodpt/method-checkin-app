@@ -18,15 +18,21 @@ export default function App() {
     fetchTrainers();
   }, []);
 
-  async function fetchClients() {
-    const { data, error } = await supabase.from('clients').select('*');
-    if (!error) setClients(data);
-  }
+ async function fetchClients() {
+  const { data, error } = await supabase.from('clients').select('*');
+  console.log("CLIENTS DATA:", data);
+  console.log("CLIENTS ERROR:", error);
+  if (!error) setClients(data);
+}
 
-  async function fetchTrainers() {
-    const { data, error } = await supabase.from('trainers').select('*');
-    if (!error) setTrainers(data);
-  }
+
+ async function fetchTrainers() {
+  const { data, error } = await supabase.from('trainers').select('*');
+  console.log("TRAINERS DATA:", data);
+  console.log("TRAINERS ERROR:", error);
+  if (!error) setTrainers(data);
+}
+
 
   async function handleCheckIn() {
     if (!selectedClient || !selectedTrainer) {
