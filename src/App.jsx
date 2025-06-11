@@ -1,99 +1,123 @@
-import { useState, useEffect } from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function App() {
-  const [clients, setClients] = useState([]);
-  const [trainers, setTrainers] = useState([]);
-  const [selectedClient, setSelectedClient] = useState('');
-  const [selectedTrainer, setSelectedTrainer] = useState('');
-  const [status, setStatus] = useState('');
+  const [view, setView] = useState('checkin');
+  const [clientName, setClientName] = useState('');
+  const [partnered, setPartnered] = useState(false);
+  const [partnerName, setPartnerName] = useState('');
+  const [sessionCount, setSessionCount] = useState('');
+  const [sessionType, setSessionType] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
 
-  useEffect(() => {
-    fetchClients();
-    fetchTrainers();
-  }, []);
-
- async function fetchClients() {
-  const { data, error } = await supabase.from('clients').select('*');
-  console.log("CLIENTS DATA:", data);
-  console.log("CLIENTS ERROR:", error);
-  if (!error) setClients(data);
-}
-
-
- async function fetchTrainers() {
-  const { data, error } = await supabase.from('trainers').select('*');
-  console.log("TRAINERS DATA:", data);
-  console.log("TRAINERS ERROR:", error);
-  if (!error) setTrainers(data);
-}
-
-
-  async function handleCheckIn() {
-    if (!selectedClient || !selectedTrainer) {
-      setStatus('Please select both a client and trainer.');
+  const handleAddClient = async () => {
+    if (!clientName || !sessionCount || !sessionType) {
+      setStatusMessage('Please fill in all required fields.');
       return;
     }
 
-    const client = clients.find(c => c.id === selectedClient);
-    if (client.remaining_sessions <= 0) {
-      setStatus('Client has no remaining sessions.');
-      return;
-    }
-
-    await supabase
-      .from('clients')
-      .update({ remaining_sessions: client.remaining_sessions - 1 })
-      .eq('id', selectedClient);
-
-    await supabase.from('checkins').insert([
-      { client_id: selectedClient, trainer_id: selectedTrainer }
+    const { error } = await supabase.from('clients').insert([
+      {
+        name: clientName,
+        remaining_sessions: parseInt(sessionCount),
+        session_type: sessionType,
+        partner_name: partnered ? partnerName : null,
+        created_at: new Date().toISOString()
+      }
     ]);
 
-    setStatus('Check-in successful!');
-    setSelectedClient('');
-    setSelectedTrainer('');
-    fetchClients();
-  }
+    if (error) {
+      console.error(error);
+      setStatusMessage('Error adding client.');
+    } else {
+      setStatusMessage('Client added successfully!');
+      setClientName('');
+      setPartnerName('');
+      setSessionCount('');
+      setSessionType('');
+      setPartnered(false);
+    }
+  };
 
   return (
-    <div style={{ padding: 20, fontFamily: 'sans-serif' }}>
-      <h2>Client Check-In</h2>
+    <div className="p-6 max-w-xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">The Method Training App</h1>
 
-      <div>
-        <label>Client: </label>
-        <select value={selectedClient} onChange={e => setSelectedClient(e.target.value)}>
-          <option value=''>Select Client</option>
-          {clients.map(c => (
-            <option key={c.id} value={c.id}>
-              {c.name} ({c.remaining_sessions} left)
-            </option>
-          ))}
-        </select>
+      <div className="mb-4">
+        <button onClick={() => setView('checkin')} className="mr-4">Check-In</button>
+        <button onClick={() => setView('addClient')}>Add Client</button>
       </div>
 
-      <div style={{ marginTop: 10 }}>
-        <label>Trainer: </label>
-        <select value={selectedTrainer} onChange={e => setSelectedTrainer(e.target.value)}>
-          <option value=''>Select Trainer</option>
-          {trainers.map(t => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {view === 'addClient' && (
+        <div className="space-y-4 border p-4 rounded">
+          <h2 className="text-xl font-semibold">Add New Client</h2>
 
-      <button style={{ marginTop: 20 }} onClick={handleCheckIn}>
-        Check In
-      </button>
+          <input
+            className="w-full border p-2"
+            type="text"
+            placeholder="Client Name"
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+          />
 
-      {status && <p style={{ marginTop: 20, color: 'green' }}>{status}</p>}
+          <div>
+            <label className="mr-2">
+              <input
+                type="checkbox"
+                checked={partnered}
+                onChange={() => setPartnered(!partnered)}
+              />{' '}
+              Client has a partner?
+            </label>
+          </div>
+
+          {partnered && (
+            <input
+              className="w-full border p-2"
+              type="text"
+              placeholder="Partner Name"
+              value={partnerName}
+              onChange={(e) => setPartnerName(e.target.value)}
+            />
+          )}
+
+          <input
+            className="w-full border p-2"
+            type="number"
+            placeholder="Session Count"
+            value={sessionCount}
+            onChange={(e) => setSessionCount(e.target.value)}
+          />
+
+          <select
+            className="w-full border p-2"
+            value={sessionType}
+            onChange={(e) => setSessionType(e.target.value)}
+          >
+            <option value="">Select Session Type</option>
+            <option value="1on1">1-on-1</option>
+            <option value="partner">Partner</option>
+            <option value="3plus">3+ Group</option>
+          </select>
+
+          <button onClick={handleAddClient} className="bg-blue-600 text-white px-4 py-2 rounded">
+            Add Client
+          </button>
+
+          {statusMessage && <p className="mt-2 text-sm text-red-600">{statusMessage}</p>}
+        </div>
+      )}
+
+      {view === 'checkin' && (
+        <div className="text-gray-600">
+          <p className="text-lg">✅ Check-in screen will go here next.</p>
+        </div>
+      )}
     </div>
   );
 }
