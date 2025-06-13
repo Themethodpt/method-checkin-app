@@ -1,3 +1,4 @@
+// Regenerated App.jsx with full check-in system, client panel, and history viewer
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
