@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
@@ -16,16 +15,26 @@ export default function App() {
   const [sessionTypes, setSessionTypes] = useState([]);
   const [statusMessage, setStatusMessage] = useState('');
 
+  const [clients, setClients] = useState([]);
+  const [trainers, setTrainers] = useState([]);
+  const [selectedClient, setSelectedClient] = useState('');
+  const [selectedTrainer, setSelectedTrainer] = useState('');
+  const [selectedSessionType, setSelectedSessionType] = useState('');
+  const [checkinMessage, setCheckinMessage] = useState('');
+
   useEffect(() => {
-    async function fetchSessionTypes() {
-      const { data, error } = await supabase.from('session_types').select('*');
-      if (error) {
-        console.error('Error fetching session types:', error);
-      } else {
-        setSessionTypes(data);
-      }
-    }
-    fetchSessionTypes();
+    const fetchData = async () => {
+      const [sessionTypesRes, clientsRes, trainersRes] = await Promise.all([
+        supabase.from('session_types').select('*'),
+        supabase.from('clients').select('*'),
+        supabase.from('trainers').select('*'),
+      ]);
+
+      if (!sessionTypesRes.error) setSessionTypes(sessionTypesRes.data);
+      if (!clientsRes.error) setClients(clientsRes.data);
+      if (!trainersRes.error) setTrainers(trainersRes.data);
+    };
+    fetchData();
   }, []);
 
   const handleAddClient = async () => {
@@ -54,6 +63,49 @@ export default function App() {
       setPartnerName('');
       setSessionCount('');
       setSessionType('');
+    }
+  };
+
+  const handleCheckIn = async () => {
+    if (!selectedClient || !selectedTrainer || !selectedSessionType) {
+      setCheckinMessage('Please select all fields.');
+      return;
+    }
+
+    const client = clients.find(c => c.id === selectedClient);
+    if (!client || client.remaining_sessions <= 0) {
+      setCheckinMessage('Client has no remaining sessions.');
+      return;
+    }
+
+    const { error: insertError } = await supabase.from('check_ins').insert([
+      {
+        client_id: selectedClient,
+        trainer_id: selectedTrainer,
+        session_type: selectedSessionType,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+
+    if (insertError) {
+      setCheckinMessage('Error recording check-in.');
+      console.error(insertError);
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from('clients')
+      .update({ remaining_sessions: client.remaining_sessions - 1 })
+      .eq('id', selectedClient);
+
+    if (updateError) {
+      setCheckinMessage('Check-in saved, but failed to update session count.');
+      console.error(updateError);
+    } else {
+      setCheckinMessage('Check-in recorded and session count updated.');
+      setSelectedClient('');
+      setSelectedTrainer('');
+      setSelectedSessionType('');
     }
   };
 
@@ -93,8 +145,31 @@ export default function App() {
       )}
 
       {view === 'checkin' && (
-        <div className="text-gray-600">
-          <p className="text-lg">✅ Check-in screen will go here next.</p>
+        <div className="space-y-4">
+          <select className="w-full border p-2" value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)}>
+            <option value="">Select Client</option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>{client.name}</option>
+            ))}
+          </select>
+
+          <select className="w-full border p-2" value={selectedTrainer} onChange={(e) => setSelectedTrainer(e.target.value)}>
+            <option value="">Select Trainer</option>
+            {trainers.map((trainer) => (
+              <option key={trainer.id} value={trainer.id}>{trainer.name}</option>
+            ))}
+          </select>
+
+          <select className="w-full border p-2" value={selectedSessionType} onChange={(e) => setSelectedSessionType(e.target.value)}>
+            <option value="">Select Session Type</option>
+            {sessionTypes.map((type) => (
+              <option key={type.id} value={type.name}>{type.name}</option>
+            ))}
+          </select>
+
+          <button onClick={handleCheckIn} className="bg-green-600 text-white px-4 py-2 rounded">Check In</button>
+
+          {checkinMessage && <p className="mt-2 text-sm text-blue-600">{checkinMessage}</p>}
         </div>
       )}
     </div>
